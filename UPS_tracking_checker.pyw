@@ -89,6 +89,15 @@ def _script_dir() -> str:
     return os.path.dirname(os.path.abspath(__file__))
 
 
+def _resource_path(name: str) -> str:
+    """Resolve a bundled resource (logo PNG) whether running from source or
+    from a PyInstaller one-file EXE (extra files are extracted to _MEIPASS)."""
+    if getattr(sys, "frozen", False):
+        base = getattr(sys, "_MEIPASS", _script_dir())
+        return os.path.join(base, name)
+    return os.path.join(_script_dir(), name)
+
+
 def _set_window_icon(root):
     """Set taskbar + titlebar icon from the embedded GFH_Telecom_TBLogo.ico."""
     try:
@@ -103,7 +112,7 @@ def _set_window_icon(root):
     except Exception:
         pass
     # Fallback: use the brand PNG as the window icon
-    png_path = os.path.join(_script_dir(), LOGO_PNG_NAME)
+    png_path = _resource_path(LOGO_PNG_NAME)
     try:
         if os.path.exists(png_path) and HAS_PIL:
             root.iconphoto(True, _PIT.PhotoImage(_PI.open(png_path)))
@@ -440,7 +449,7 @@ class UPSGuiApp:
         hdr.pack(fill="x"); hdr.pack_propagate(False)
 
         # Logo on the left - composite on NAVY, thumbnail to 260x82
-        logo_path = os.path.join(_script_dir(), LOGO_PNG_NAME)
+        logo_path = _resource_path(LOGO_PNG_NAME)
         if os.path.exists(logo_path) and HAS_PIL:
             try:
                 img = _PI.open(logo_path).convert("RGBA")

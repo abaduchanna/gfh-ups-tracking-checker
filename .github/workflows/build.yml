@@ -28,6 +28,7 @@ jobs:
           pyinstaller --onefile --windowed --clean
           --name "UPS_tracking_checker"
           --icon "GFH_Telecom_TBLogo.ico"
+          --add-data "GFH_Telecom_Logo.png;."
           --collect-all selenium
           "UPS_tracking_checker.pyw"
       - name: Upload exe directly to release (no Actions storage used)
