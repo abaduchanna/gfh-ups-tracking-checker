@@ -429,20 +429,41 @@ class UPSGuiApp:
         self._logo_img = None
 
         root.title("GFH Telecom - UPS Tracking System")
-        # Size relative to screen resolution (deducting a margin) so it always fits.
-        # Widened from 800 -> 1150 so the Progress & Results log has real breathing
-        # room instead of being squeezed into ~370px alongside the input panel.
-        root.update_idletasks()
-        _sw,_sh=root.winfo_screenwidth(),root.winfo_screenheight()
-        _w,_h=min(1150,_sw-80),min(680,_sh-120)
-        root.geometry(f"{_w}x{_h}+{(_sw-_w)//2}+{(_sh-_h)//2}")
-        root.minsize(900, 560)
-        root.configure(bg=LIGHT); root.eval("tk::PlaceWindow . center")
+        # Dynamic screen resolution support: size to 90% of the screen and
+        # center it (DPI-aware), then stay a normal resizable top-level so
+        # Windows Snap (50% left/right, corners, Win+arrow) keeps working.
+        self._apply_dynamic_geometry()
+        root.configure(bg=LIGHT)
         _set_window_icon(root)
         root.protocol("WM_DELETE_WINDOW", self.on_closing)
 
         self._styles(); self._header(); self._body(); self._copyright_bar()
         self.process_queue()
+
+    def _apply_dynamic_geometry(self) -> None:
+        """Size the window to 90% of the screen and center it.
+
+        Works on any laptop/monitor/PC (1080p, 1440p, 2K, 4K) and respects
+        Windows DPI scaling (run after _enable_dpi_awareness()). The window
+        stays resizable so Windows Snap gestures keep working — it centers
+        on launch, then snaps normally to 50% left/right, corners or via
+        Win+arrow shortcuts.
+        """
+        try:
+            root = self.root
+            root.update_idletasks()
+            sw, sh = root.winfo_screenwidth(), root.winfo_screenheight()
+            w = max(640, min(int(sw * 0.90), sw - 20))
+            h = max(480, min(int(sh * 0.90), sh - 40))
+            x = max(0, (sw - w) // 2)
+            y = max(0, (sh - h) // 2)
+            root.geometry(f"{w}x{h}+{x}+{y}")
+            # minsize <= half the screen so 50% / corner snap is never blocked
+            root.minsize(min(900, max(560, sw // 2)),
+                         min(560, max(420, sh // 2)))
+            root.resizable(True, True)
+        except Exception:
+            pass
 
     # ── styles ─────────────────────────────────────────────────────────────
     def _styles(self):
@@ -726,7 +747,23 @@ class UPSGuiApp:
         self.root.destroy()
 
 
+def _enable_dpi_awareness() -> None:
+    """Make Windows report physical pixels so winfo_screen* is accurate on
+    high-DPI displays (1080p, 1440p, 2K, 4K, DPI-scaled laptops)."""
+    if sys.platform != "win32":
+        return
+    try:
+        import ctypes
+        try:
+            ctypes.windll.shcore.SetProcessDpiAwareness(1)  # system DPI aware
+        except Exception:
+            ctypes.windll.user32.SetProcessDPIAware()
+    except Exception:
+        pass
+
+
 def main():
+    _enable_dpi_awareness()
     root = tk.Tk()
     UPSGuiApp(root)
     root.mainloop()
