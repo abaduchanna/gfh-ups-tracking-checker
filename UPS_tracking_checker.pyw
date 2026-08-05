@@ -100,6 +100,14 @@ def _resource_path(name: str) -> str:
 
 def _set_window_icon(root):
     """Set taskbar + titlebar icon from the embedded GFH_Telecom_TBLogo.ico."""
+    # Without an AppUserModelID, Windows may show a generic/blank taskbar
+    # icon for Tcl/Tk windows even when the titlebar icon renders fine.
+    try:
+        import ctypes
+        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(
+            "GFHTelecom.UPS")
+    except Exception:
+        pass
     try:
         import base64, tempfile, atexit
         data = base64.b64decode(ICON_ICO_B64.strip())
@@ -108,6 +116,15 @@ def _set_window_icon(root):
         atexit.register(lambda p=tmp.name: os.path.exists(p) and os.unlink(p))
         root.iconbitmap(default=False, bitmap=tmp.name)
         root.iconbitmap(tmp.name)
+        # Re-apply the same artwork via iconphoto so the taskbar button and
+        # Alt-Tab pick up the logo too (keep a reference so Tk keeps it).
+        if HAS_PIL:
+            try:
+                _photo = _PIT.PhotoImage(_PI.open(tmp.name))
+                root._icon_photo_ref = _photo
+                root.iconphoto(True, _photo)
+            except Exception:
+                pass
         return
     except Exception:
         pass
@@ -470,7 +487,7 @@ class UPSGuiApp:
                      fg=RED, bg=NAVY).pack()
 
         tf = tk.Frame(hdr, bg=NAVY)
-        tf.place(relx=0.58, rely=0.5, anchor="center")
+        tf.place(relx=0.5, rely=0.5, anchor="center")
         tk.Label(tf, text="UPS TRACKING SYSTEM",
                  font=("Calibri", 18, "bold"), fg=WHITE, bg=NAVY).pack()
         tk.Label(tf, text="Real-time package verification via Edge",
