@@ -12,7 +12,7 @@ Paste tracking numbers, checks each one via headless Edge, saves CSV.
 Ship this file together with GFH_Telecom_TBLogo.ico and GFH_Telecom_Logo.png
 in the same folder for the window/taskbar icon and header logo.
 
-Developed by Abad Umair Channa  |  Copyright 2026
+Developed by Abad Umair Channa  |  Copyright © 2026
 """
 
 import re
