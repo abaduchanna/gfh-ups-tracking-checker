@@ -510,6 +510,9 @@ class UPSGuiApp:
         hdr.pack(fill="x"); hdr.pack_propagate(False)
         hdr._tag = "header"
 
+
+        hdr.bind("<Enter>", lambda e, w=hdr: w.configure(bg=NAVY))
+        hdr.bind("<Leave>", lambda e, w=hdr: w.configure(bg=NAVY))
         # Logo on the left - composite on NAVY, thumbnail to 260x82
         logo_path = _resource_path(LOGO_PNG_NAME)
         if os.path.exists(logo_path) and HAS_PIL:
