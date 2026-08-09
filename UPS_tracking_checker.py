@@ -121,56 +121,40 @@ def _extract_embedded_icon(b64, filename):
         return None
 
 def _set_window_icon(root):
-    """Set taskbar + titlebar icon from the embedded GFH_Telecom_TBLogo.ico."""
-    # Use EMBEDDED_ICON_B64 first (self-contained, works in frozen .exe)
+    """Set taskbar + titlebar icon from embedded base64 ICO."""
+    import base64, tempfile, atexit, os
+    # Decode the embedded ICO to a temp file that persists until exit
     try:
-        _embedded_ico = _extract_embedded_icon(EMBEDDED_ICON_B64, "app_icon.ico")
-        if _embedded_ico:
-            root.iconbitmap(default=False, bitmap=_embedded_ico)
-            root.iconbitmap(_embedded_ico)
-            return
-    except Exception:
-        pass
-    # Without an AppUserModelID, Windows may show a generic/blank taskbar
-    # icon for Tcl/Tk windows even when the titlebar icon renders fine.
-    try:
-        import ctypes
-        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(
-            "GFHTelecom.UPS")
-    except Exception:
-        pass
-    try:
-        import base64, tempfile, atexit
-        data = base64.b64decode(ICON_ICO_B64.strip())
+        data = base64.b64decode(EMBEDDED_ICON_B64.strip())
         tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".ico")
-        tmp.write(data); tmp.close()
+        tmp.write(data)
+        tmp.close()
         atexit.register(lambda p=tmp.name: os.path.exists(p) and os.unlink(p))
         root.iconbitmap(default=False, bitmap=tmp.name)
         root.iconbitmap(tmp.name)
-        # Re-apply the same artwork via iconphoto so the taskbar button and
-        # Alt-Tab pick up the logo too (keep a reference so Tk keeps it).
-        if HAS_PIL:
-            try:
-                _photo = _PIT.PhotoImage(_PI.open(tmp.name))
-                root._icon_photo_ref = _photo
-                root.iconphoto(True, _photo)
-            except Exception:
-                pass
         return
     except Exception:
         pass
-    # Fallback: use the brand PNG as the window icon
-    png_path = _resource_path(LOGO_PNG_NAME)
+    # Fallback: try ICON_ICO_B64
     try:
-        if os.path.exists(png_path) and HAS_PIL:
+        data = base64.b64decode(ICON_ICO_B64.strip())
+        tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".ico")
+        tmp.write(data)
+        tmp.close()
+        atexit.register(lambda p=tmp.name: os.path.exists(p) and os.unlink(p))
+        root.iconbitmap(default=False, bitmap=tmp.name)
+        root.iconbitmap(tmp.name)
+        return
+    except Exception:
+        pass
+    # Last resort: brand PNG via iconphoto
+    try:
+        png_path = _resource_path(LOGO_PNG_NAME)
+        if os.path.exists(png_path):
+            from PIL import Image as _PI, ImageTk as _PIT
             root.iconphoto(True, _PIT.PhotoImage(_PI.open(png_path)))
     except Exception:
         pass
-
-
-# ============================================================================
-# BOT LOGIC
-# ============================================================================
 
 def run_cmd(args, timeout=5) -> str:
     try:
@@ -582,6 +566,8 @@ class UPSGuiApp:
 
         theme_btn = create_theme_toggle_button(hdr, self.theme_manager, on_toggle=self._apply_theme)
         theme_btn.place(relx=0.98, rely=0.5, anchor="e")
+
+        self._lock_header_colors(hdr, NAVY)
 
         self._lock_header_colors(hdr, NAVY)
 
