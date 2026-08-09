@@ -443,7 +443,7 @@ class UPSGuiApp:
         self.update_queue = queue.Queue()
         self._logo_img = None
 
-        root.title("GFH Telecom - UPS Tracking System")
+        root.title("GFH Telecom - UPS Tracking Checker")
         # Dynamic screen resolution support: size to 90% of the screen and
         # center it (DPI-aware), then stay a normal resizable top-level so
         # Windows Snap (50% left/right, corners, Win+arrow) keeps working.
@@ -831,6 +831,10 @@ def _enable_dpi_awareness() -> None:
 def main():
     _enable_dpi_awareness()
     root = tk.Tk()
+try:
+    root.iconbitmap("GFH_Telecom_TBLogo.ico")
+except:
+    pass  # Icon file not found
     UPSGuiApp(root)
     root.mainloop()
 
