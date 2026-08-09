@@ -839,10 +839,6 @@ def _enable_dpi_awareness() -> None:
 def main():
     _enable_dpi_awareness()
     root = tk.Tk()
-try:
-    root.iconbitmap("gfh_icon_white.ico")
-except:
-    pass  # Icon file not found
     UPSGuiApp(root)
     root.mainloop()
 
