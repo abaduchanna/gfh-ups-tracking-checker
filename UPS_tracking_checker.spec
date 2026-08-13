@@ -16,7 +16,6 @@ a = Analysis(
     binaries=[],
     datas=[
         ('GFH_Telecom_Logo.png', '.'),
-        ('gfh_icon_white.ico', '.'),
     ],
     hiddenimports=[
         'tkinter',
