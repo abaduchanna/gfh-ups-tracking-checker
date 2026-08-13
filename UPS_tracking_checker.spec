@@ -12,11 +12,11 @@ block_cipher = None
 
 a = Analysis(
     ['UPS_tracking_checker.py'],
-    pathex=[],
+    pathex=['.'],
     binaries=[],
     datas=[
-        ('gfh_icon_white.ico', '.'),
         ('GFH_Telecom_Logo.png', '.'),
+        ('gfh_icon_white.ico', '.'),
     ],
     hiddenimports=[
         'tkinter',
