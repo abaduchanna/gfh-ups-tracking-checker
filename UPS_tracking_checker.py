@@ -15,7 +15,12 @@ Paste tracking numbers, checks each one via headless Edge, saves CSV.
 Ship this file together with gfh_icon_white.ico and GFH_Telecom_Logo.png
 in the same folder for the window/taskbar icon and header logo.
 
-Developed by Abad Umair Channa | Copyright © 2026 | All rights reserved.")
+Developed by Abad Umair Channa | Copyright © 2026 | All rights reserved.
+"""
+
+import sys
+if not sys.version_info >= (3, 10):
+    print("Python 3.10+ required.")
     sys.exit(1)
 
 # Selenium imports
