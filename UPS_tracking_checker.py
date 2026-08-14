@@ -19,6 +19,8 @@ Developed by Abad Umair Channa | Copyright © {date.today().year} | All rights r
 """
 
 import sys
+from header_manager import FixedHeaderManager
+from logo_handler import LogoHandler
 if not sys.version_info >= (3, 10):
     print("Python 3.10+ required.")
     sys.exit(1)
@@ -528,49 +530,9 @@ class UPSGuiApp:
         except Exception:
             pass
     def _header(self):
-        hdr = tk.Frame(self.root, bg=NAVY, height=108)
-        hdr.pack(fill="x"); hdr.pack_propagate(False)
-        hdr._tag = "header"
+        """Header using FixedHeaderManager."""
+        self.header_mgr = FixedHeaderManager(self.root, title="UPS Tracking Checker")
 
-
-        hdr.bind("<Enter>", lambda e, w=hdr: w.configure(bg=NAVY))
-        hdr.bind("<Leave>", lambda e, w=hdr: w.configure(bg=NAVY))
-        # Logo on the left - composite on NAVY, thumbnail to 260x82
-        logo_path = _resource_path(LOGO_PNG_NAME)
-        if os.path.exists(logo_path) and HAS_PIL:
-            try:
-                img = _PI.open(logo_path).convert("RGBA")
-                bg2 = _PI.new("RGBA", img.size, (9, 13, 38, 255))
-                bg2.paste(img, mask=img.split()[3])
-                img = bg2.convert("RGB")
-                img.thumbnail((260, 82), _PI.Resampling.LANCZOS)
-                self._logo_img = _PIT.PhotoImage(img)
-            except Exception:
-                self._logo_img = None
-
-        lf = tk.Frame(hdr, bg=NAVY)
-        lf.place(relx=0, rely=0.5, anchor="w", x=24)
-        lf._tag = "header"
-        if self._logo_img:
-            tk.Label(lf, image=self._logo_img, bg=NAVY).pack()
-        else:
-            tk.Label(lf, text="GFH TELECOM", font=("Segoe UI", 16, "bold"),
-                     fg=RED, bg=NAVY).pack()
-
-        tf = tk.Frame(hdr, bg=NAVY)
-        tf.place(relx=0.5, rely=0.5, anchor="center")
-        tf._tag = "header"
-        tk.Label(tf, text="UPS TRACKING SYSTEM",
-                 font=("Segoe UI", 18, "bold"), fg=WHITE, bg=NAVY).pack()
-        tk.Label(tf, text="Real-time package verification via Edge",
-                 font=("Segoe UI", 9), fg=WHITE, bg=NAVY).pack()
-
-        theme_btn = create_theme_toggle_button(hdr, self.theme_manager, on_toggle=self._apply_theme)
-        theme_btn.place(relx=0.98, rely=0.5, anchor="e")
-
-        self._lock_header_colors(hdr, NAVY)
-
-        self._lock_header_colors(hdr, NAVY)
 
     def _apply_theme(self, colors=None):
         apply_theme_to_window(self.root, self.theme_manager)
