@@ -456,7 +456,7 @@ class UPSGuiApp:
         root.configure(bg=LIGHT)
         root.protocol("WM_DELETE_WINDOW", self.on_closing)
 
-        self.theme_manager = ThemeManager("GFH UPS Tracking Checker")
+        self.theme_manager = ThemeManager("GFH UPS Tracking Checker", app_name="gfh-ups-tracking-checker")
         self._styles(); self._header(); self._body(); self._copyright_bar()
         apply_theme_to_window(self.root, self.theme_manager)
         self.process_queue()
