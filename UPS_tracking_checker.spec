@@ -17,9 +17,13 @@ a = Analysis(
     datas=[
         ('assets', 'assets'),
         ('GFH_Telecom_Logo.png', '.'),
+        ('logo_handler.py', '.'),
+        ('header_manager.py', '.'),
     ],
     hiddenimports=[
         'tkinter',
+        '_tkinter',
+        'tkinter._fix',
         'selenium',
         'selenium.webdriver',
         'selenium.webdriver.chrome',
@@ -80,7 +84,7 @@ exe = EXE(
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
-    upx=True,
+    upx=False,
     upx_exclude=[],
     runtime_tmpdir=None,
     console=False,
