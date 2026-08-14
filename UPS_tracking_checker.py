@@ -487,14 +487,14 @@ class UPSGuiApp:
     def _styles(self):
         s = ttk.Style(); s.theme_use("clam")
         s.configure("Run.TButton", background=RED, foreground=WHITE,
-                    font=("Calibri", 11, "bold"), padding=(16, 9), borderwidth=0)
+                    font=("Segoe UI", 11, "bold"), padding=(16, 9), borderwidth=0)
         s.map("Run.TButton",
               background=[("active", "#c01820"), ("disabled", "#aaa")])
         s.configure("Browse.TButton", background=NAVY, foreground=WHITE,
-                    font=("Calibri", 10), padding=(10, 6), borderwidth=0)
+                    font=("Segoe UI", 10), padding=(10, 6), borderwidth=0)
         s.map("Browse.TButton", background=[("active", "#1a2550")])
         s.configure("Cancel.TButton", background="#1a2550", foreground=WHITE,
-                    font=("Calibri", 10), padding=(10, 6), borderwidth=0)
+                    font=("Segoe UI", 10), padding=(10, 6), borderwidth=0)
         s.map("Cancel.TButton", background=[("active", "#2a3560")])
         s.configure("Accent.Horizontal.TProgressbar",
                     troughcolor="#dde6f0", background=RED, borderwidth=0)
@@ -554,16 +554,16 @@ class UPSGuiApp:
         if self._logo_img:
             tk.Label(lf, image=self._logo_img, bg=NAVY).pack()
         else:
-            tk.Label(lf, text="GFH TELECOM", font=("Calibri", 16, "bold"),
+            tk.Label(lf, text="GFH TELECOM", font=("Segoe UI", 16, "bold"),
                      fg=RED, bg=NAVY).pack()
 
         tf = tk.Frame(hdr, bg=NAVY)
         tf.place(relx=0.5, rely=0.5, anchor="center")
         tf._tag = "header"
         tk.Label(tf, text="UPS TRACKING SYSTEM",
-                 font=("Calibri", 18, "bold"), fg=WHITE, bg=NAVY).pack()
+                 font=("Segoe UI", 18, "bold"), fg=WHITE, bg=NAVY).pack()
         tk.Label(tf, text="Real-time package verification via Edge",
-                 font=("Calibri", 9), fg=WHITE, bg=NAVY).pack()
+                 font=("Segoe UI", 9), fg=WHITE, bg=NAVY).pack()
 
         theme_btn = create_theme_toggle_button(hdr, self.theme_manager, on_toggle=self._apply_theme)
         theme_btn.place(relx=0.98, rely=0.5, anchor="e")
@@ -594,7 +594,7 @@ class UPSGuiApp:
         left = tk.Frame(panels, bg=LIGHT)
         left.grid(row=0, column=0, sticky="nsew", padx=(0, 10))
         tk.Label(left, text="Tracking Numbers",
-                 font=("Calibri", 10, "bold"), fg=NAVY, bg=LIGHT).pack(anchor="w", pady=(0, 6))
+                 font=("Segoe UI", 10, "bold"), fg=NAVY, bg=LIGHT).pack(anchor="w", pady=(0, 6))
         self.input_text = scrolledtext.ScrolledText(
             left, height=10, font=("Consolas", 9), wrap=tk.WORD,
             bg=WHITE, fg=NAVY, relief="flat",
@@ -613,7 +613,7 @@ class UPSGuiApp:
         right = tk.Frame(panels, bg=LIGHT)
         right.grid(row=0, column=1, sticky="nsew", padx=(10, 0))
         tk.Label(right, text="Progress & Results",
-                 font=("Calibri", 10, "bold"), fg=NAVY, bg=LIGHT).pack(anchor="w", pady=(0, 6))
+                 font=("Segoe UI", 10, "bold"), fg=NAVY, bg=LIGHT).pack(anchor="w", pady=(0, 6))
         self.output_log = scrolledtext.ScrolledText(
             right, height=10, font=("Consolas", 9), wrap=tk.WORD,
             bg=LOG_BG, fg=LOG_FG, relief="flat")
@@ -644,17 +644,17 @@ class UPSGuiApp:
                                        state="disabled")
         self.open_csv_btn.pack(side="left", padx=(0, 8))
         self.progress_label = tk.Label(act, text="Ready", bg=LIGHT, fg=NAVY,
-                                       font=("Calibri", 9))
+                                       font=("Segoe UI", 9))
         self.progress_label.pack(side="left")
         self.status_label = tk.Label(act, text="", bg=LIGHT, fg=NAVY,
-                                     font=("Calibri", 9))
+                                     font=("Segoe UI", 9))
         self.status_label.pack(side="right")
 
     def _copyright_bar(self):
         bar = tk.Frame(self.root, bg=NAVY, height=26)
         bar.pack(fill="x", side="bottom"); bar.pack_propagate(False)
         tk.Label(bar, text=COPYRIGHT_TEXT, bg=NAVY, fg="#9d9db8",
-                 font=("Calibri", 8)).pack(pady=4)
+                 font=("Segoe UI", 8)).pack(pady=4)
 
     # ── GUI logic methods ──────────────────────────────────────────────────
     def log_message(self, level: str, message: str):
