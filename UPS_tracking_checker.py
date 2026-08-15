@@ -20,6 +20,8 @@ Developed by Abad Umair Channa | Copyright © {date.today().year} | All rights r
 """
 
 import sys
+import tkinter as tk
+from tkinter import ttk, messagebox, scrolledtext, filedialog
 from header_manager import FixedHeaderManager
 from logo_handler import LogoHandler
 if not sys.version_info >= (3, 10):
