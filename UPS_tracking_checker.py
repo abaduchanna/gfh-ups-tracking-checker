@@ -796,6 +796,7 @@ def _enable_dpi_awareness() -> None:
 
 
 def main():
+    import tkinter as tk
     _enable_dpi_awareness()
     root = tk.Tk()
     UPSGuiApp(root)
