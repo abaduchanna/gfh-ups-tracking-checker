@@ -535,13 +535,24 @@ class UPSGuiApp:
     def _header(self):
         """Header using FixedHeaderManager."""
         self.header_mgr = FixedHeaderManager(self.root, title="UPS Tracking Checker")
+        try:
+            _lp = _resource_path(LOGO_PNG_NAME) if "_resource_path" in dir() else os.path.join(os.path.dirname(os.path.abspath(__file__)), LOGO_PNG_NAME)
+            if os.path.exists(_lp):
+                self.header_mgr.set_logo(logo_path=_lp, text="GFH")
+        except Exception:
+            pass
         self.header_mgr.add_theme_toggle(self.theme_manager)
 
 
     def _apply_theme(self, colors=None):
+        """Apply theme colors to all widgets."""
+        if colors is None:
+            colors = self.theme_manager.get_colors()
         apply_theme_to_window(self.root, self.theme_manager)
-
-    # ── body ───────────────────────────────────────────────────────────────
+        try:
+            self.root.configure(bg=colors.get("bg", "#f6f7fb"))
+        except Exception:
+            pass
     def _body(self):
         body = tk.Frame(self.root, bg=LIGHT)
         body.pack(fill="both", expand=True, padx=24, pady=18)
