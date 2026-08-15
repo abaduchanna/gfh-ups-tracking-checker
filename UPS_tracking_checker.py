@@ -470,7 +470,7 @@ class UPSGuiApp:
 
         self.theme_manager = ThemeManager("GFH UPS Tracking Checker", app_name="gfh-ups-tracking-checker")
         self._styles(); self._header(); self._body(); self._copyright_bar()
-        apply_theme_to_window(self.root, self.theme_manager)
+        # apply_theme_to_window removed — _walk handles all styling
         self.process_queue()
 
     def _apply_dynamic_geometry(self) -> None:
@@ -568,7 +568,7 @@ class UPSGuiApp:
                 colors = self.theme_manager.get_colors()
             except Exception:
                 return
-        apply_theme_to_window(self.root, self.theme_manager)
+        # apply_theme_to_window removed — _walk handles all styling
         try:
             self.root.configure(bg=colors.get("bg", "#f6f7fb"))
         except Exception:
