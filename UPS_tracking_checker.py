@@ -20,10 +20,17 @@ Developed by Abad Umair Channa | Copyright © {date.today().year} | All rights r
 """
 
 import sys
+import queue
+import threading
+import os
+import time
+import re
+import tempfile
 import tkinter as tk
 from tkinter import ttk, messagebox, scrolledtext, filedialog
 from header_manager import FixedHeaderManager
 from logo_handler import LogoHandler
+import base64
 if not sys.version_info >= (3, 10):
     print("Python 3.10+ required.")
     sys.exit(1)
