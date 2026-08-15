@@ -1,3 +1,4 @@
+from theme_manager import ThemeManager, apply_theme_to_window, get_copyright_year
 from datetime import date
 #!/usr/bin/env python3
 import shutil
