@@ -19,6 +19,7 @@ a = Analysis(
         ('GFH_Telecom_Logo.png', '.'),
         ('logo_handler.py', '.'),
         ('header_manager.py', '.'),
+        ('theme_manager.py', '.'),
     ],
     hiddenimports=[
         'tkinter',
