@@ -533,6 +533,7 @@ class UPSGuiApp:
     def _header(self):
         """Header using FixedHeaderManager."""
         self.header_mgr = FixedHeaderManager(self.root, title="UPS Tracking Checker")
+        self.header_mgr.add_theme_toggle(self.theme_manager)
 
 
     def _apply_theme(self, colors=None):
