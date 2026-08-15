@@ -1,5 +1,7 @@
 from datetime import date
 #!/usr/bin/env python3
+import shutil
+import subprocess
 import datetime as _doc_dt
 _DOC_YEAR = _doc_dt.date.today().year
 
