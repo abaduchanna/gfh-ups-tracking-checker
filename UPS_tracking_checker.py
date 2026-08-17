@@ -241,7 +241,15 @@ class UPSTrackingBot:
         self.wait = None
         self.results: List[Dict[str, str]] = []
         self.saved_count = 0
-        self.profile_dir = tempfile.mkdtemp(prefix="ups_edge_profile_")
+        # Use a stable, persistent profile dir rather than a fresh temp dir
+        # on every run. A temp dir caused Edge to fail profile-lock checks
+        # on some builds, and also discards any cached session data between
+        # runs. The dir is created if it doesn't exist.
+        self.profile_dir = os.path.join(
+            os.path.expanduser("~"), "AppData", "Local",
+            "GFH_UPS_Tracking_Edge_Profile"
+        )
+        os.makedirs(self.profile_dir, exist_ok=True)
         self.progress_callback = progress_callback
         self.is_cancelled = False
 
