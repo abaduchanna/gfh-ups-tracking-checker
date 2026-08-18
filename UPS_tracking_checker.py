@@ -255,10 +255,11 @@ class UPSTrackingBot:
 
     def make_options(self):
         options = Options()
-        options.add_argument("--headless=new")
+        # Do NOT use headless — many Edge/Chromium builds silently fail on
+        # UPS.com's bot-detection in headless mode. Run visible instead.
         options.add_argument("--disable-dev-shm-usage")
         options.add_argument("--disable-gpu")
-        options.add_argument("--window-size=1920,1080")
+        options.add_argument("--window-size=1280,900")
         options.add_argument(f"--user-data-dir={self.profile_dir}")
         options.add_argument("--profile-directory=Default")
         options.add_argument("--no-first-run")
@@ -445,8 +446,10 @@ class UPSTrackingBot:
         if self.driver:
             try: self.driver.quit()
             except Exception: pass
-        try: shutil.rmtree(self.profile_dir, ignore_errors=True)
-        except Exception: pass
+        # Do NOT delete self.profile_dir — it is now a persistent path under
+        # AppData/Local/GFH_UPS_Tracking_Edge_Profile. Deleting it after
+        # every run was causing Edge to fail profile-lock checks on the next
+        # run because the directory structure it expected was gone.
 
 
 # ═══════════════════════════════════════════════════════════════════════════
