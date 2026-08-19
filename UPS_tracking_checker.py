@@ -766,21 +766,23 @@ class UPSGuiApp:
         self.log_message("log", f"Results: {self.output_file}")
         self.status_label.config(text=f"Processing {len(tracking_numbers)} numbers...")
         self.worker_thread = threading.Thread(target=self.run_tracking_worker,
-                                              args=(tracking_numbers, True), daemon=True)
+                                              args=(tracking_numbers,), daemon=True)
         self.worker_thread.start()
 
-    def run_tracking_worker(self, tracking_numbers: List[str], is_headless: bool):
+    def run_tracking_worker(self, tracking_numbers: List[str]):
         bot = None
         try:
-            bot = UPSTrackingBot(headless=is_headless, progress_callback=self.queue_callback)
+            bot = UPSTrackingBot(headless=False, progress_callback=self.queue_callback)
             self.active_bot = bot
+            self.update_queue.put(("log", "Launching Edge browser..."))
             bot.start_driver()
             bot.process_all(tracking_numbers, self.output_file)
             self.update_queue.put(("completed", None))
         except Exception as e:
-            error_msg = f"Fatal error: {str(e)}"
-            self.log_message("error", error_msg)
-            self.update_queue.put(("error", error_msg))
+            import traceback
+            error_msg = f"Error: {str(e)}\n{traceback.format_exc()}"
+            self.update_queue.put(("log", error_msg))
+            self.update_queue.put(("error", str(e)))
         finally:
             if bot: bot.close()
 
