@@ -588,7 +588,7 @@ class UPSGuiApp:
         except Exception:
             pass
         # Walk all widgets and apply colors, but SKIP header widgets
-        _PROTECTED = {"header", "header_label", "brand", "logo", "run", "sched", "stop"}
+        _PROTECTED = {"header", "header_label", "brand", "logo", "run", "sched", "stop", "footer"}
         def _walk(widget):
             try:
                 tag = getattr(widget, "_tag", None)
@@ -603,6 +603,13 @@ class UPSGuiApp:
                         widget.configure(bg=colors.get("input", "#ffffff"), fg=fg)
                     elif isinstance(widget, tk.Button):
                         widget.configure(bg=bg, fg=fg)
+                    else:
+                        try:
+                            import tkinter.scrolledtext as _st
+                            if isinstance(widget, _st.ScrolledText):
+                                widget.configure(bg=colors.get("panel", "#ffffff"), fg=fg)
+                        except Exception:
+                            pass
                 for child in widget.winfo_children():
                     _walk(child)
             except Exception:
@@ -613,10 +620,12 @@ class UPSGuiApp:
     def _body(self):
         body = tk.Frame(self.root, bg=LIGHT)
         body.pack(fill="both", expand=True, padx=24, pady=18)
+        self._body_frame = body  # keep ref for theme updates
 
         # ── Two-column panel area ──────────────────────────────────────────
         panels = tk.Frame(body, bg=LIGHT)
         panels.pack(fill="both", expand=True)
+        self._panels_frame = panels
         # Weighted grid (not equal pack) so the log panel gets more real
         # estate — tracking-number lines are short, but result rows
         # ("Tracking Number: ... - Status: ... - Date: ...") run long.
@@ -687,8 +696,11 @@ class UPSGuiApp:
     def _copyright_bar(self):
         bar = tk.Frame(self.root, bg=NAVY, height=26)
         bar.pack(fill="x", side="bottom"); bar.pack_propagate(False)
-        tk.Label(bar, text=COPYRIGHT_TEXT, bg=NAVY, fg="#9d9db8",
-                 font=("Segoe UI", 8)).pack(pady=4)
+        bar._tag = "footer"
+        lbl = tk.Label(bar, text=COPYRIGHT_TEXT, bg=NAVY, fg="#c7cbe0",
+                 font=("Segoe UI", 8))
+        lbl.place(relx=0.5, rely=0.5, anchor="center")
+        lbl._tag = "footer"
 
     # ── GUI logic methods ──────────────────────────────────────────────────
     def log_message(self, level: str, message: str):
