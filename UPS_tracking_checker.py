@@ -284,14 +284,23 @@ class UPSTrackingBot:
         get_edge_major_version()
         self.log("Launching Microsoft Edge...")
         try:
-            self.driver = webdriver.Edge(service=Service(), options=self.make_options())
+            # Try webdriver-manager first (auto-downloads matching msedgedriver)
+            try:
+                from webdriver_manager.microsoft import EdgeChromiumDriverManager
+                svc = Service(EdgeChromiumDriverManager().install())
+            except Exception:
+                # Fall back to PATH/selenium's built-in driver manager
+                svc = Service()
+            self.driver = webdriver.Edge(service=svc, options=self.make_options())
             self.wait = WebDriverWait(self.driver, 40)
             self.driver.set_page_load_timeout(60)
             self.log("Browser ready.\n")
         except Exception as e:
             raise RuntimeError(
                 f"Microsoft Edge could not launch.\n"
-                f"Run: python -m pip install --upgrade selenium\nError: {e}")
+                f"Fix: pip install webdriver-manager\n"
+                f"Or update msedgedriver to match your Edge version.\n"
+                f"Error: {e}")
 
     def log(self, message: str):
         if self.progress_callback:
@@ -305,7 +314,8 @@ class UPSTrackingBot:
                 "current": current, "total": total,
                 "tracking": tracking, "result": result})
 
-    def extract_tracking_numbers(self, text: str) -> List[str]:
+    @staticmethod
+    def extract_tracking_numbers(text: str) -> List[str]:
         text = text.replace(",", "\n")
         candidates = []
         for line in text.splitlines():
@@ -754,7 +764,7 @@ class UPSGuiApp:
         input_content = self.input_text.get(1.0, tk.END).strip()
         if not input_content:
             messagebox.showwarning("No Input", "Please paste tracking numbers first!"); return
-        tracking_numbers = UPSTrackingBot().extract_tracking_numbers(input_content)
+        tracking_numbers = UPSTrackingBot.extract_tracking_numbers(input_content)
         if not tracking_numbers:
             messagebox.showwarning("No Valid Numbers",
                                   "No valid UPS tracking numbers found!"); return
