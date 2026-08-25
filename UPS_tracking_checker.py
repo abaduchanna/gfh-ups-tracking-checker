@@ -271,6 +271,7 @@ class UPSTrackingBot:
         if self.driver:
             try: self.driver.quit()
             except Exception: pass
+            time.sleep(1)  # let the profile lock release
         get_edge_major_version()
         self.log("Launching Microsoft Edge...")
         try:
@@ -278,7 +279,8 @@ class UPSTrackingBot:
             try:
                 from webdriver_manager.microsoft import EdgeChromiumDriverManager
                 svc = Service(EdgeChromiumDriverManager().install())
-            except Exception:
+            except Exception as e:
+                self.log(f"webdriver-manager unavailable ({e}), falling back to system driver...")
                 # Fall back to PATH/selenium's built-in driver manager
                 svc = Service()
             self.driver = webdriver.Edge(service=svc, options=self.make_options())
@@ -449,10 +451,34 @@ class UPSTrackingBot:
         if self.driver:
             try: self.driver.quit()
             except Exception: pass
-        # Do NOT delete self.profile_dir — it is now a persistent path under
-        # AppData/Local/GFH_UPS_Tracking_Edge_Profile. Deleting it after
-        # every run was causing Edge to fail profile-lock checks on the next
-        # run because the directory structure it expected was gone.
+            # Give Edge a moment to fully release the profile lock
+            time.sleep(1)
+        # If the profile is still locked (Edge process didn't release it),
+        # kill only the Edge processes that are using OUR profile directory.
+        # This avoids killing the user's personal Edge browser sessions.
+        if sys.platform == "win32":
+            try:
+                # Use wmic to find Edge PIDs whose command line references
+                # our specific profile directory, then kill only those.
+                result = subprocess.run(
+                    ["wmic", "process", "where",
+                     f"name='msedge.exe' and commandline like '%{self.profile_dir}%'",
+                     "get", "processid"],
+                    capture_output=True, text=True, timeout=10
+                )
+                pids = []
+                for line in (result.stdout or "").splitlines():
+                    line = line.strip()
+                    if line.isdigit():
+                        pids.append(line)
+                for pid in pids:
+                    try:
+                        subprocess.run(["taskkill", "/F", "/PID", pid],
+                                       capture_output=True, timeout=5)
+                    except Exception:
+                        pass
+            except Exception:
+                pass
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -479,7 +505,7 @@ class UPSGuiApp:
         # center it (DPI-aware), then stay a normal resizable top-level so
         # Windows Snap (50% left/right, corners, Win+arrow) keeps working.
         self._apply_dynamic_geometry()
-        self.after(10, lambda: self.state("zoomed"))
+        self.root.after(10, lambda: self.root.state("zoomed"))
         root.configure(bg=LIGHT)
         root.protocol("WM_DELETE_WINDOW", self.on_closing)
 
