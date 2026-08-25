@@ -1,10 +1,9 @@
 from theme_manager import ThemeManager, apply_theme_to_window, get_copyright_year
-from datetime import date
+from datetime import date, datetime
 #!/usr/bin/env python3
 import shutil
 import subprocess
 import datetime as _doc_dt
-import datetime
 _DOC_YEAR = _doc_dt.date.today().year
 
 f"""
