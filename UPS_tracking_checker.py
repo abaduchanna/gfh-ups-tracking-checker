@@ -46,7 +46,12 @@ try:
     from selenium.webdriver.common.by import By
     from selenium.webdriver.support.ui import WebDriverWait
     from selenium.webdriver.support import expected_conditions as EC
-    from selenium.common.exceptions import TimeoutException
+    from selenium.common.exceptions import (
+        TimeoutException,
+        WebDriverException,
+        NoSuchWindowException,
+        InvalidSessionIdException,
+    )
 except ImportError as e:
     messagebox.showerror("Missing Dependency",
         f"Required package is missing: {e}\n\n"
@@ -302,6 +307,13 @@ def create_edge_driver(log=print):
 
         driver = webdriver.Edge(options=options)
         driver.set_page_load_timeout(60)
+
+        # Prepare a real navigation tab (avoid Edge UI surfaces like Downloads)
+        if not prepare_edge_automation_tab(driver, log=log):
+            raise RuntimeError(
+                "Edge is open, but Selenium could not attach to a normal browser tab. "
+                "Close the Edge Downloads popup/flyout and try again."
+            )
         return driver
 
     # Fallback: standalone driver with our profile
@@ -320,6 +332,97 @@ def create_edge_driver(log=print):
     driver = webdriver.Edge(options=options)
     driver.set_page_load_timeout(60)
     return driver
+
+
+# ── Tab management helpers (from vidapay-extractor pattern) ──────────────────
+
+def _get_driver_handles(driver):
+    try:
+        return list(driver.window_handles)
+    except (NoSuchWindowException, InvalidSessionIdException, WebDriverException):
+        return []
+    except Exception:
+        return []
+
+
+def _is_browser_chrome_url(url):
+    lower_url = (url or "").lower().strip()
+    return lower_url.startswith(("edge://", "chrome://", "devtools://",
+                                  "edge-extension://", "chrome-extension://"))
+
+
+def _switch_to_first_live_content_tab(driver, log=print):
+    handles = _get_driver_handles(driver)
+    if not handles:
+        return False
+    fallback_handle = None
+    for handle in handles:
+        try:
+            driver.switch_to.window(handle)
+            current_url = ""
+            try:
+                current_url = driver.current_url or ""
+            except Exception:
+                current_url = ""
+            if not fallback_handle:
+                fallback_handle = handle
+            if current_url and not _is_browser_chrome_url(current_url):
+                return True
+            if current_url in ("about:blank", "data:,", ""):
+                return True
+        except Exception:
+            continue
+    if fallback_handle:
+        try:
+            driver.switch_to.window(fallback_handle)
+            return True
+        except Exception:
+            return False
+    return False
+
+
+def _open_blank_normal_tab(driver, log=print):
+    """Open a normal web-content tab and switch Selenium to it."""
+    if not _switch_to_first_live_content_tab(driver, log=log):
+        open_vpn_setup_browser("about:blank", log=log)
+        time.sleep(1.5)
+    try:
+        driver.switch_to.new_window("tab")
+        time.sleep(0.5)
+        log("Created fresh Edge tab for automation.")
+        return True
+    except Exception:
+        pass
+    try:
+        driver.execute_cdp_cmd("Target.createTarget", {"url": "about:blank"})
+        time.sleep(1)
+        before_handles = set(_get_driver_handles(driver))
+        after_handles = _get_driver_handles(driver)
+        new_handles = [h for h in after_handles if h not in before_handles]
+        for handle in reversed(new_handles or after_handles):
+            try:
+                driver.switch_to.window(handle)
+                log("Created fresh Edge tab through DevTools.")
+                return True
+            except Exception:
+                continue
+    except Exception:
+        pass
+    open_vpn_setup_browser("about:blank", log=log)
+    time.sleep(1.5)
+    return _switch_to_first_live_content_tab(driver, log=log)
+
+
+def prepare_edge_automation_tab(driver, log=print):
+    """Ensure Selenium is attached to a normal browser tab, not Edge UI."""
+    if _open_blank_normal_tab(driver, log=log):
+        try:
+            driver.get("about:blank")
+        except Exception:
+            pass
+        return True
+    log("Could not prepare a normal Edge tab for automation.")
+    return False
 
 
 MONTH_MAP = {
