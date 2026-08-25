@@ -388,8 +388,10 @@ class UPSTrackingBot:
                 return {"Tracking": tracking_number, "Result": f"Delivered {date_str}"}
             return {"Tracking": tracking_number, "Result": "Delivered"}
         except TimeoutException:
+            self.log(f"⚠️ Timeout checking {tracking_number}")
             return {"Tracking": tracking_number, "Result": "Not delivered"}
         except Exception as e:
+            self.log(f"❌ ERROR checking {tracking_number}: {e}")
             return {"Tracking": tracking_number, "Result": f"ERROR: {e}"}
 
     def save_results(self, output_file: str, force: bool = False):
@@ -782,8 +784,9 @@ class UPSGuiApp:
             self.update_queue.put(("completed", None))
         except Exception as e:
             import traceback
-            error_msg = f"Error: {str(e)}\n{traceback.format_exc()}"
-            self.update_queue.put(("log", error_msg))
+            tb = traceback.format_exc()
+            # Log the full error + traceback to the log panel in red
+            self.update_queue.put(("error", f"❌ ERROR: {e}\n{tb}"))
             self.update_queue.put(("error", str(e)))
         finally:
             if bot: bot.close()
@@ -833,7 +836,12 @@ class UPSGuiApp:
             while True:
                 msg_type, data = self.update_queue.get_nowait()
                 if msg_type == "completed": self.on_tracking_completed()
-                elif msg_type == "error": self.on_tracking_error(data)
+                elif msg_type == "error":
+                    # If data is a multi-line error/traceback, log it to the panel
+                    if isinstance(data, str) and "\n" in data:
+                        self.log_message("error", data)
+                    else:
+                        self.on_tracking_error(data)
                 elif msg_type in ("log", "progress"): self.handle_callback(msg_type, data)
         except queue.Empty: pass
         self.root.after(100, self.process_queue)
