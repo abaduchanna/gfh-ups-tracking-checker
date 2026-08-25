@@ -46,12 +46,7 @@ try:
     from selenium.webdriver.common.by import By
     from selenium.webdriver.support.ui import WebDriverWait
     from selenium.webdriver.support import expected_conditions as EC
-    from selenium.common.exceptions import (
-        TimeoutException,
-        WebDriverException,
-        NoSuchWindowException,
-        InvalidSessionIdException,
-    )
+    from selenium.common.exceptions import TimeoutException
 except ImportError as e:
     messagebox.showerror("Missing Dependency",
         f"Required package is missing: {e}\n\n"
@@ -90,14 +85,6 @@ ICON_ICO_NAME = "gfh_icon.ico"
 LOGO_PNG_NAME = "GFH_Telecom_Logo.png"
 COPYRIGHT_TEXT = f"Developed by Abad Umair Channa | Copyright © {date.today().year} | All rights reserved."
 ICON_ICO_B64 = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "icon_ico_b64.txt"), "r").read().strip() if not getattr(sys, "frozen", False) else open(os.path.join(getattr(sys, "_MEIPASS", "."), "assets", "icon_ico_b64.txt"), "r").read().strip()
-
-# ── Edge automation profile + port ───────────────────────────────────────────
-# Distinct from Extractor (9222), Ordering (9223), Transfer Bot (9224) so
-# running multiple GFH/VidaPay tools at once each gets its own Edge
-# process/window instead of colliding on a shared profile+port.
-AUTOMATION_PROFILE_DIR = r"C:\GFH_Edge_Automation_Profile_UPS"
-REMOTE_DEBUGGING_PORT = 9225
-ATTACH_TO_OPEN_EDGE = True
 
 
 def _script_dir() -> str:
@@ -222,207 +209,6 @@ def get_edge_major_version() -> Optional[int]:
     return None
 
 
-# ── Edge automation helpers (profile + port pattern) ─────────────────────────
-
-def get_edge_exe_path():
-    """Find the Edge executable on Windows."""
-    possible_paths = [
-        shutil.which("msedge"),
-        r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
-        r"C:\Program Files\Microsoft\Edge\Application\msedge.exe",
-    ]
-    for path in possible_paths:
-        if path and os.path.exists(path):
-            return path
-    return None
-
-
-def is_port_open(host="127.0.0.1", port=REMOTE_DEBUGGING_PORT, timeout=1):
-    """Check if the remote debugging port is open (Edge is running)."""
-    import socket
-    try:
-        with socket.create_connection((host, port), timeout=timeout):
-            return True
-    except Exception:
-        return False
-
-
-def open_vpn_setup_browser(url="about:blank", log=print):
-    """Launch a dedicated Edge process with our profile + port."""
-    edge_path = get_edge_exe_path()
-    if not edge_path:
-        log("Microsoft Edge executable not found.")
-        return False
-
-    os.makedirs(AUTOMATION_PROFILE_DIR, exist_ok=True)
-
-    args = [
-        edge_path,
-        f"--remote-debugging-port={REMOTE_DEBUGGING_PORT}",
-        f"--user-data-dir={AUTOMATION_PROFILE_DIR}",
-        "--profile-directory=Default",
-        "--no-first-run",
-        "--no-default-browser-check",
-        url,
-    ]
-
-    try:
-        subprocess.Popen(args)
-        log("Opened dedicated Edge automation browser.")
-
-        for _ in range(20):
-            if is_port_open():
-                log("Automation Edge remote connection is ready.")
-                return True
-            time.sleep(0.5)
-
-        log("Edge opened, but remote debugging port is not ready yet.")
-        return False
-    except Exception as e:
-        log(f"Failed to open Edge: {e}")
-        return False
-
-
-def create_edge_driver(log=print):
-    """Create a Selenium Edge driver. If ATTACH_TO_OPEN_EDGE is True,
-    attach to an already-running Edge on our debug port (launching it
-    first if needed). Otherwise, create a standalone driver."""
-    if ATTACH_TO_OPEN_EDGE:
-        if not is_port_open():
-            log("Automation Edge is not open.")
-            log("Opening VPN Browser Setup now.")
-            open_vpn_setup_browser(log=log)
-
-        if not is_port_open():
-            raise RuntimeError(
-                "Automation Edge is not available on remote debugging port. "
-                "Click Open VPN Browser Setup first and keep that Edge window open."
-            )
-
-        options = Options()
-        options.add_experimental_option(
-            "debuggerAddress",
-            f"127.0.0.1:{REMOTE_DEBUGGING_PORT}"
-        )
-
-        driver = webdriver.Edge(options=options)
-        driver.set_page_load_timeout(60)
-
-        # Prepare a real navigation tab (avoid Edge UI surfaces like Downloads)
-        if not prepare_edge_automation_tab(driver, log=log):
-            raise RuntimeError(
-                "Edge is open, but Selenium could not attach to a normal browser tab. "
-                "Close the Edge Downloads popup/flyout and try again."
-            )
-        return driver
-
-    # Fallback: standalone driver with our profile
-    options = Options()
-    options.add_argument("--disable-dev-shm-usage")
-    options.add_argument("--disable-gpu")
-    options.add_argument("--window-size=1280,900")
-    options.add_argument(f"--user-data-dir={AUTOMATION_PROFILE_DIR}")
-    options.add_argument("--profile-directory=Default")
-    options.add_argument("--no-first-run")
-    options.add_argument("--no-default-browser-check")
-    options.add_argument("--disable-blink-features=AutomationControlled")
-    options.add_experimental_option("excludeSwitches", ["enable-automation", "enable-logging"])
-    options.add_experimental_option("useAutomationExtension", False)
-
-    driver = webdriver.Edge(options=options)
-    driver.set_page_load_timeout(60)
-    return driver
-
-
-# ── Tab management helpers (from vidapay-extractor pattern) ──────────────────
-
-def _get_driver_handles(driver):
-    try:
-        return list(driver.window_handles)
-    except (NoSuchWindowException, InvalidSessionIdException, WebDriverException):
-        return []
-    except Exception:
-        return []
-
-
-def _is_browser_chrome_url(url):
-    lower_url = (url or "").lower().strip()
-    return lower_url.startswith(("edge://", "chrome://", "devtools://",
-                                  "edge-extension://", "chrome-extension://"))
-
-
-def _switch_to_first_live_content_tab(driver, log=print):
-    handles = _get_driver_handles(driver)
-    if not handles:
-        return False
-    fallback_handle = None
-    for handle in handles:
-        try:
-            driver.switch_to.window(handle)
-            current_url = ""
-            try:
-                current_url = driver.current_url or ""
-            except Exception:
-                current_url = ""
-            if not fallback_handle:
-                fallback_handle = handle
-            if current_url and not _is_browser_chrome_url(current_url):
-                return True
-            if current_url in ("about:blank", "data:,", ""):
-                return True
-        except Exception:
-            continue
-    if fallback_handle:
-        try:
-            driver.switch_to.window(fallback_handle)
-            return True
-        except Exception:
-            return False
-    return False
-
-
-def _open_blank_normal_tab(driver, log=print):
-    """Open a normal web-content tab and switch Selenium to it."""
-    if not _switch_to_first_live_content_tab(driver, log=log):
-        open_vpn_setup_browser("about:blank", log=log)
-        time.sleep(1.5)
-    try:
-        driver.switch_to.new_window("tab")
-        time.sleep(0.5)
-        log("Created fresh Edge tab for automation.")
-        return True
-    except Exception:
-        pass
-    try:
-        driver.execute_cdp_cmd("Target.createTarget", {"url": "about:blank"})
-        time.sleep(1)
-        before_handles = set(_get_driver_handles(driver))
-        after_handles = _get_driver_handles(driver)
-        new_handles = [h for h in after_handles if h not in before_handles]
-        for handle in reversed(new_handles or after_handles):
-            try:
-                driver.switch_to.window(handle)
-                log("Created fresh Edge tab through DevTools.")
-                return True
-            except Exception:
-                continue
-    except Exception:
-        pass
-    open_vpn_setup_browser("about:blank", log=log)
-    time.sleep(1.5)
-    return _switch_to_first_live_content_tab(driver, log=log)
-
-
-def prepare_edge_automation_tab(driver, log=print):
-    """Ensure Selenium is attached to a normal browser tab, not Edge UI."""
-    if _open_blank_normal_tab(driver, log=log):
-        try:
-            driver.get("about:blank")
-        except Exception:
-            pass
-        return True
-    log("Could not prepare a normal Edge tab for automation.")
-    return False
 
 
 MONTH_MAP = {
@@ -450,28 +236,47 @@ class UPSTrackingBot:
         self.wait = None
         self.results: List[Dict[str, str]] = []
         self.saved_count = 0
+        # Fresh temp profile every run — no persistent profile, no lock conflicts
+        self.profile_dir = tempfile.mkdtemp(prefix="ups_edge_profile_")
         self.progress_callback = progress_callback
         self.is_cancelled = False
+
+    def make_options(self):
+        options = Options()
+        # Always headless — works reliably with UPS.com
+        options.add_argument("--headless=new")
+        options.add_argument("--disable-dev-shm-usage")
+        options.add_argument("--disable-gpu")
+        options.add_argument("--window-size=1920,1080")
+        options.add_argument(f"--user-data-dir={self.profile_dir}")
+        options.add_argument("--profile-directory=Default")
+        options.add_argument("--no-first-run")
+        options.add_argument("--no-default-browser-check")
+        options.add_argument("--disable-blink-features=AutomationControlled")
+        options.add_experimental_option("excludeSwitches", ["enable-automation", "enable-logging"])
+        options.add_experimental_option("useAutomationExtension", False)
+        options.add_argument(
+            "--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/120.0.0.0 Safari/537.36 Edg/120.0.0.0"
+        )
+        return options
 
     def start_driver(self):
         if self.driver:
             try: self.driver.quit()
             except Exception: pass
-            time.sleep(1)  # let the profile lock release
         get_edge_major_version()
         self.log("Launching Microsoft Edge...")
         try:
-            # Use the shared create_edge_driver() which handles the
-            # dedicated profile + port pattern (attach to open Edge).
-            self.driver = create_edge_driver(log=self.log)
+            self.driver = webdriver.Edge(service=Service(), options=self.make_options())
             self.wait = WebDriverWait(self.driver, 40)
             self.driver.set_page_load_timeout(60)
             self.log("Browser ready.\n")
         except Exception as e:
             raise RuntimeError(
                 f"Microsoft Edge could not launch.\n"
-                f"Make sure Edge is installed and not already running\n"
-                f"with a conflicting profile.\n"
+                f"Run: python -m pip install --upgrade selenium\n"
                 f"Error: {e}")
 
     def log(self, message: str):
@@ -628,12 +433,15 @@ class UPSTrackingBot:
         self.is_cancelled = True
 
     def close(self):
-        """Detach from the Edge driver. Does NOT kill the Edge process —
-        the user may want to keep the Edge window open for the next run."""
         if self.driver:
             try: self.driver.quit()
             except Exception: pass
             self.driver = None
+        # Clean up the temp profile directory
+        try:
+            shutil.rmtree(self.profile_dir, ignore_errors=True)
+        except Exception:
+            pass
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -868,9 +676,6 @@ class UPSGuiApp:
                                        style="Browse.TButton", command=self.open_csv_folder,
                                        state="disabled")
         self.open_csv_btn.pack(side="left", padx=(0, 8))
-        self.vpn_btn = ttk.Button(act, text="Open Edge Browser",
-                                  style="Browse.TButton", command=self.open_edge_browser)
-        self.vpn_btn.pack(side="left", padx=(0, 8))
         self.progress_label = tk.Label(act, text="Ready", bg=LIGHT, fg=NAVY,
                                        font=("Segoe UI", 9))
         self.progress_label.pack(side="left")
@@ -1022,21 +827,6 @@ class UPSGuiApp:
             else: subprocess.run(["xdg-open", folder])
         else:
             messagebox.showwarning("No File", "No results file found yet!")
-
-    def open_edge_browser(self):
-        """Open the dedicated Edge automation browser with our profile+port."""
-        if is_port_open():
-            messagebox.showinfo("Edge Already Open",
-                                "The automation Edge browser is already running.\n"
-                                "You can click Start Tracking now.")
-            return
-        self.log_message("log", "Opening dedicated Edge automation browser...")
-        if open_vpn_setup_browser(log=self.log_message if hasattr(self, 'log_message') else print):
-            self.log_message("log", "Edge is ready. Click Start Tracking to begin.")
-        else:
-            messagebox.showwarning("Edge Failed",
-                                   "Could not open the automation Edge browser.\n"
-                                   "Make sure Microsoft Edge is installed.")
 
     def process_queue(self):
         try:
