@@ -777,11 +777,6 @@ class UPSGuiApp:
             if not tracking_numbers:
                 messagebox.showwarning("No Valid Numbers",
                                       "No valid UPS tracking numbers found!"); return
-            if not messagebox.askyesno("Start Tracking",
-                                       f"Found {len(tracking_numbers)} tracking number(s).\n\n"
-                                       "This will check each one.\n"
-                                       "Results saved automatically.\n\nProceed?"):
-                return
             self.output_log.delete(1.0, tk.END)
             self.progress_var.set(0)
             timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
