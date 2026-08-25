@@ -268,16 +268,41 @@ class UPSTrackingBot:
             except Exception: pass
         get_edge_major_version()
         self.log("Launching Microsoft Edge...")
+
+        # Selenium Manager (Service() with no args) auto-downloads the
+        # matching msedgedriver. Try that first; if it fails, fall back to
+        # webdriver-manager.
+        self.driver = None
+        last_error = None
+
+        # Strategy 1: Selenium Manager (built into selenium 4.10+)
         try:
+            self.log("Trying Selenium Manager (auto-download)...")
             self.driver = webdriver.Edge(service=Service(), options=self.make_options())
-            self.wait = WebDriverWait(self.driver, 40)
-            self.driver.set_page_load_timeout(60)
-            self.log("Browser ready.\n")
-        except Exception as e:
+        except Exception as e1:
+            last_error = e1
+            self.log(f"Selenium Manager failed: {e1}")
+
+        # Strategy 2: webdriver-manager
+        if self.driver is None:
+            try:
+                self.log("Trying webdriver-manager...")
+                from webdriver_manager.microsoft import EdgeChromiumDriverManager
+                svc = Service(EdgeChromiumDriverManager().install())
+                self.driver = webdriver.Edge(service=svc, options=self.make_options())
+            except Exception as e2:
+                last_error = e2
+                self.log(f"webdriver-manager failed: {e2}")
+
+        if self.driver is None:
             raise RuntimeError(
                 f"Microsoft Edge could not launch.\n"
-                f"Run: python -m pip install --upgrade selenium\n"
-                f"Error: {e}")
+                f"Last error: {last_error}\n\n"
+                f"Fix: pip install --upgrade selenium webdriver-manager")
+
+        self.wait = WebDriverWait(self.driver, 40)
+        self.driver.set_page_load_timeout(60)
+        self.log("Browser ready.\n")
 
     def log(self, message: str):
         if self.progress_callback:
@@ -776,10 +801,14 @@ class UPSGuiApp:
     def run_tracking_worker(self, tracking_numbers: List[str]):
         bot = None
         try:
+            self.update_queue.put(("log", "Creating UPSTrackingBot..."))
             bot = UPSTrackingBot(headless=False, progress_callback=self.queue_callback)
             self.active_bot = bot
-            self.update_queue.put(("log", "Launching Edge browser..."))
+
+            self.update_queue.put(("log", "Launching Microsoft Edge (headless)..."))
             bot.start_driver()
+            self.update_queue.put(("log", "Browser ready. Starting tracking..."))
+
             bot.process_all(tracking_numbers, self.output_file)
             self.update_queue.put(("completed", None))
         except Exception as e:
@@ -787,9 +816,12 @@ class UPSGuiApp:
             tb = traceback.format_exc()
             # Log the full error + traceback to the log panel in red
             self.update_queue.put(("error", f"❌ ERROR: {e}\n{tb}"))
-            self.update_queue.put(("error", str(e)))
         finally:
-            if bot: bot.close()
+            if bot:
+                try:
+                    bot.close()
+                except Exception as ce:
+                    self.update_queue.put(("log", f"Cleanup error: {ce}"))
 
     def cancel_tracking(self):
         if self.is_processing:
@@ -835,15 +867,20 @@ class UPSGuiApp:
         try:
             while True:
                 msg_type, data = self.update_queue.get_nowait()
-                if msg_type == "completed": self.on_tracking_completed()
+                if msg_type == "completed":
+                    self.on_tracking_completed()
                 elif msg_type == "error":
-                    # If data is a multi-line error/traceback, log it to the panel
                     if isinstance(data, str) and "\n" in data:
+                        # Multi-line traceback → log to panel in red
                         self.log_message("error", data)
                     else:
-                        self.on_tracking_error(data)
-                elif msg_type in ("log", "progress"): self.handle_callback(msg_type, data)
-        except queue.Empty: pass
+                        # Single-line error → log to panel AND show popup later
+                        self.log_message("error", f"❌ {data}")
+                        self.root.after(10, lambda d=data: self.on_tracking_error(d))
+                elif msg_type in ("log", "progress"):
+                    self.handle_callback(msg_type, data)
+        except queue.Empty:
+            pass
         self.root.after(100, self.process_queue)
 
     def on_closing(self):
