@@ -28,6 +28,7 @@ import threading
 import os
 import time
 import re
+import csv
 import tempfile
 import tkinter as tk
 from tkinter import ttk, messagebox, scrolledtext, filedialog
