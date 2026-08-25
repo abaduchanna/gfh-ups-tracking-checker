@@ -799,29 +799,41 @@ class UPSGuiApp:
         self.worker_thread.start()
 
     def run_tracking_worker(self, tracking_numbers: List[str]):
+        """Worker thread — runs the tracking bot. ALL log messages go through
+        self.update_queue so the GUI log panel shows them. We also print to
+        stderr as a backup so if the GUI is somehow dead, you can still see
+        what's happening by running the .pyw from a command prompt."""
+        import traceback as _tb
+        def _log(msg):
+            print(f"[WORKER] {msg}", file=sys.stderr, flush=True)
+            self.update_queue.put(("log", msg))
+
         bot = None
         try:
-            self.update_queue.put(("log", "Creating UPSTrackingBot..."))
+            _log("Creating UPSTrackingBot...")
             bot = UPSTrackingBot(headless=False, progress_callback=self.queue_callback)
             self.active_bot = bot
 
-            self.update_queue.put(("log", "Launching Microsoft Edge (headless)..."))
+            _log("Launching Microsoft Edge (headless)...")
             bot.start_driver()
-            self.update_queue.put(("log", "Browser ready. Starting tracking..."))
+            _log("Browser ready. Starting tracking...")
 
             bot.process_all(tracking_numbers, self.output_file)
+            _log("All tracking numbers processed.")
             self.update_queue.put(("completed", None))
         except Exception as e:
-            import traceback
-            tb = traceback.format_exc()
-            # Log the full error + traceback to the log panel in red
+            tb = _tb.format_exc()
+            _log(f"❌ ERROR: {e}")
+            print(tb, file=sys.stderr, flush=True)
             self.update_queue.put(("error", f"❌ ERROR: {e}\n{tb}"))
         finally:
             if bot:
                 try:
                     bot.close()
+                    _log("Browser closed.")
                 except Exception as ce:
-                    self.update_queue.put(("log", f"Cleanup error: {ce}"))
+                    _log(f"Cleanup error: {ce}")
+                    print(f"Cleanup error: {ce}", file=sys.stderr, flush=True)
 
     def cancel_tracking(self):
         if self.is_processing:
