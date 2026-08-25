@@ -864,8 +864,7 @@ class UPSGuiApp:
             self.open_csv_btn.config(state="normal")
         self.status_label.config(text="Tracking completed")
         self.progress_label.config(text="Complete!")
-        messagebox.showinfo("Tracking Complete",
-                           f"Tracking check completed!\n\nResults:\n{self.output_file}")
+        self.log_message("success", f"✅ Tracking complete! Results: {self.output_file}")
 
     def on_tracking_error(self, error_msg: str):
         self.is_processing = False; self.active_bot = None
@@ -908,9 +907,7 @@ class UPSGuiApp:
 
     def on_closing(self):
         if self.is_processing:
-            if not messagebox.askyesno("Confirm Exit",
-                                       "Tracking is still in progress.\n\nExit?"):
-                return
+            self.log_message("warning", "Closing while tracking is in progress...")
         self.root.destroy()
 
 
