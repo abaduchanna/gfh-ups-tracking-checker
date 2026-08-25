@@ -4,6 +4,7 @@ from datetime import date
 import shutil
 import subprocess
 import datetime as _doc_dt
+import datetime
 _DOC_YEAR = _doc_dt.date.today().year
 
 f"""
@@ -766,37 +767,47 @@ class UPSGuiApp:
         self.log_message("log", "Input cleared")
 
     def start_tracking(self):
-        if self.is_processing:
-            messagebox.showwarning("Processing", "Already processing!"); return
-        input_content = self.input_text.get(1.0, tk.END).strip()
-        if not input_content:
-            messagebox.showwarning("No Input", "Please paste tracking numbers first!"); return
-        tracking_numbers = UPSTrackingBot.extract_tracking_numbers(input_content)
-        if not tracking_numbers:
-            messagebox.showwarning("No Valid Numbers",
-                                  "No valid UPS tracking numbers found!"); return
-        if not messagebox.askyesno("Start Tracking",
-                                   f"Found {len(tracking_numbers)} tracking number(s).\n\n"
-                                   "This will check each one.\n"
-                                   "Results saved automatically.\n\nProceed?"):
-            return
-        self.output_log.delete(1.0, tk.END)
-        self.progress_var.set(0)
-        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        self.output_file = os.path.join(os.path.expanduser("~/Downloads"),
-                                       f"ups_tracking_results_{timestamp}.csv")
-        self.is_processing = True
-        self.start_btn.config(state="disabled")
-        self.cancel_btn.config(state="normal")
-        self.paste_btn.config(state="disabled")
-        self.clear_btn.config(state="disabled")
-        self.open_csv_btn.config(state="disabled")
-        self.log_message("log", f"Starting tracking for {len(tracking_numbers)} packages...")
-        self.log_message("log", f"Results: {self.output_file}")
-        self.status_label.config(text=f"Processing {len(tracking_numbers)} numbers...")
-        self.worker_thread = threading.Thread(target=self.run_tracking_worker,
-                                              args=(tracking_numbers,), daemon=True)
-        self.worker_thread.start()
+        try:
+            if self.is_processing:
+                messagebox.showwarning("Processing", "Already processing!"); return
+            input_content = self.input_text.get(1.0, tk.END).strip()
+            if not input_content:
+                messagebox.showwarning("No Input", "Please paste tracking numbers first!"); return
+            tracking_numbers = UPSTrackingBot.extract_tracking_numbers(input_content)
+            if not tracking_numbers:
+                messagebox.showwarning("No Valid Numbers",
+                                      "No valid UPS tracking numbers found!"); return
+            if not messagebox.askyesno("Start Tracking",
+                                       f"Found {len(tracking_numbers)} tracking number(s).\n\n"
+                                       "This will check each one.\n"
+                                       "Results saved automatically.\n\nProceed?"):
+                return
+            self.output_log.delete(1.0, tk.END)
+            self.progress_var.set(0)
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            self.output_file = os.path.join(os.path.expanduser("~/Downloads"),
+                                           f"ups_tracking_results_{timestamp}.csv")
+            self.is_processing = True
+            self.start_btn.config(state="disabled")
+            self.cancel_btn.config(state="normal")
+            self.paste_btn.config(state="disabled")
+            self.clear_btn.config(state="disabled")
+            self.open_csv_btn.config(state="disabled")
+            self.log_message("log", f"Starting tracking for {len(tracking_numbers)} packages...")
+            self.log_message("log", f"Results: {self.output_file}")
+            self.status_label.config(text=f"Processing {len(tracking_numbers)} numbers...")
+            self.worker_thread = threading.Thread(target=self.run_tracking_worker,
+                                                  args=(tracking_numbers,), daemon=True)
+            self.worker_thread.start()
+        except Exception as e:
+            import traceback as _tb
+            tb = _tb.format_exc()
+            # Show the error in the log panel (red) AND as a popup
+            try:
+                self.log_message("error", f"❌ ERROR in start_tracking:\n{tb}")
+            except Exception:
+                pass
+            messagebox.showerror("Error", f"An error occurred:\n\n{e}\n\n{tb}")
 
     def run_tracking_worker(self, tracking_numbers: List[str]):
         """Worker thread — runs the tracking bot. ALL log messages go through
