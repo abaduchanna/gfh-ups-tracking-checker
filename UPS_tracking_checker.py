@@ -86,6 +86,14 @@ LOGO_PNG_NAME = "GFH_Telecom_Logo.png"
 COPYRIGHT_TEXT = f"Developed by Abad Umair Channa | Copyright © {date.today().year} | All rights reserved."
 ICON_ICO_B64 = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "icon_ico_b64.txt"), "r").read().strip() if not getattr(sys, "frozen", False) else open(os.path.join(getattr(sys, "_MEIPASS", "."), "assets", "icon_ico_b64.txt"), "r").read().strip()
 
+# ── Edge automation profile + port ───────────────────────────────────────────
+# Distinct from Extractor (9222), Ordering (9223), Transfer Bot (9224) so
+# running multiple GFH/VidaPay tools at once each gets its own Edge
+# process/window instead of colliding on a shared profile+port.
+AUTOMATION_PROFILE_DIR = r"C:\GFH_Edge_Automation_Profile_UPS"
+REMOTE_DEBUGGING_PORT = 9225
+ATTACH_TO_OPEN_EDGE = True
+
 
 def _script_dir() -> str:
     """Directory containing this .pyw (or .exe when frozen)."""
@@ -209,6 +217,111 @@ def get_edge_major_version() -> Optional[int]:
     return None
 
 
+# ── Edge automation helpers (profile + port pattern) ─────────────────────────
+
+def get_edge_exe_path():
+    """Find the Edge executable on Windows."""
+    possible_paths = [
+        shutil.which("msedge"),
+        r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
+        r"C:\Program Files\Microsoft\Edge\Application\msedge.exe",
+    ]
+    for path in possible_paths:
+        if path and os.path.exists(path):
+            return path
+    return None
+
+
+def is_port_open(host="127.0.0.1", port=REMOTE_DEBUGGING_PORT, timeout=1):
+    """Check if the remote debugging port is open (Edge is running)."""
+    import socket
+    try:
+        with socket.create_connection((host, port), timeout=timeout):
+            return True
+    except Exception:
+        return False
+
+
+def open_vpn_setup_browser(url="about:blank", log=print):
+    """Launch a dedicated Edge process with our profile + port."""
+    edge_path = get_edge_exe_path()
+    if not edge_path:
+        log("Microsoft Edge executable not found.")
+        return False
+
+    os.makedirs(AUTOMATION_PROFILE_DIR, exist_ok=True)
+
+    args = [
+        edge_path,
+        f"--remote-debugging-port={REMOTE_DEBUGGING_PORT}",
+        f"--user-data-dir={AUTOMATION_PROFILE_DIR}",
+        "--profile-directory=Default",
+        "--no-first-run",
+        "--no-default-browser-check",
+        url,
+    ]
+
+    try:
+        subprocess.Popen(args)
+        log("Opened dedicated Edge automation browser.")
+
+        for _ in range(20):
+            if is_port_open():
+                log("Automation Edge remote connection is ready.")
+                return True
+            time.sleep(0.5)
+
+        log("Edge opened, but remote debugging port is not ready yet.")
+        return False
+    except Exception as e:
+        log(f"Failed to open Edge: {e}")
+        return False
+
+
+def create_edge_driver(log=print):
+    """Create a Selenium Edge driver. If ATTACH_TO_OPEN_EDGE is True,
+    attach to an already-running Edge on our debug port (launching it
+    first if needed). Otherwise, create a standalone driver."""
+    if ATTACH_TO_OPEN_EDGE:
+        if not is_port_open():
+            log("Automation Edge is not open.")
+            log("Opening VPN Browser Setup now.")
+            open_vpn_setup_browser(log=log)
+
+        if not is_port_open():
+            raise RuntimeError(
+                "Automation Edge is not available on remote debugging port. "
+                "Click Open VPN Browser Setup first and keep that Edge window open."
+            )
+
+        options = Options()
+        options.add_experimental_option(
+            "debuggerAddress",
+            f"127.0.0.1:{REMOTE_DEBUGGING_PORT}"
+        )
+
+        driver = webdriver.Edge(options=options)
+        driver.set_page_load_timeout(60)
+        return driver
+
+    # Fallback: standalone driver with our profile
+    options = Options()
+    options.add_argument("--disable-dev-shm-usage")
+    options.add_argument("--disable-gpu")
+    options.add_argument("--window-size=1280,900")
+    options.add_argument(f"--user-data-dir={AUTOMATION_PROFILE_DIR}")
+    options.add_argument("--profile-directory=Default")
+    options.add_argument("--no-first-run")
+    options.add_argument("--no-default-browser-check")
+    options.add_argument("--disable-blink-features=AutomationControlled")
+    options.add_experimental_option("excludeSwitches", ["enable-automation", "enable-logging"])
+    options.add_experimental_option("useAutomationExtension", False)
+
+    driver = webdriver.Edge(options=options)
+    driver.set_page_load_timeout(60)
+    return driver
+
+
 MONTH_MAP = {
     "January": 1, "February": 2, "March": 3, "April": 4,
     "May": 5, "June": 6, "July": 7, "August": 8,
@@ -234,38 +347,8 @@ class UPSTrackingBot:
         self.wait = None
         self.results: List[Dict[str, str]] = []
         self.saved_count = 0
-        # Use a stable, persistent profile dir rather than a fresh temp dir
-        # on every run. A temp dir caused Edge to fail profile-lock checks
-        # on some builds, and also discards any cached session data between
-        # runs. The dir is created if it doesn't exist.
-        self.profile_dir = os.path.join(
-            os.path.expanduser("~"), "AppData", "Local",
-            "GFH_UPS_Tracking_Edge_Profile"
-        )
-        os.makedirs(self.profile_dir, exist_ok=True)
         self.progress_callback = progress_callback
         self.is_cancelled = False
-
-    def make_options(self):
-        options = Options()
-        # Do NOT use headless — many Edge/Chromium builds silently fail on
-        # UPS.com's bot-detection in headless mode. Run visible instead.
-        options.add_argument("--disable-dev-shm-usage")
-        options.add_argument("--disable-gpu")
-        options.add_argument("--window-size=1280,900")
-        options.add_argument(f"--user-data-dir={self.profile_dir}")
-        options.add_argument("--profile-directory=Default")
-        options.add_argument("--no-first-run")
-        options.add_argument("--no-default-browser-check")
-        options.add_argument("--disable-blink-features=AutomationControlled")
-        options.add_experimental_option("excludeSwitches", ["enable-automation", "enable-logging"])
-        options.add_experimental_option("useAutomationExtension", False)
-        options.add_argument(
-            "--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-            "AppleWebKit/537.36 (KHTML, like Gecko) "
-            "Chrome/120.0.0.0 Safari/537.36 Edg/120.0.0.0"
-        )
-        return options
 
     def start_driver(self):
         if self.driver:
@@ -275,23 +358,17 @@ class UPSTrackingBot:
         get_edge_major_version()
         self.log("Launching Microsoft Edge...")
         try:
-            # Try webdriver-manager first (auto-downloads matching msedgedriver)
-            try:
-                from webdriver_manager.microsoft import EdgeChromiumDriverManager
-                svc = Service(EdgeChromiumDriverManager().install())
-            except Exception as e:
-                self.log(f"webdriver-manager unavailable ({e}), falling back to system driver...")
-                # Fall back to PATH/selenium's built-in driver manager
-                svc = Service()
-            self.driver = webdriver.Edge(service=svc, options=self.make_options())
+            # Use the shared create_edge_driver() which handles the
+            # dedicated profile + port pattern (attach to open Edge).
+            self.driver = create_edge_driver(log=self.log)
             self.wait = WebDriverWait(self.driver, 40)
             self.driver.set_page_load_timeout(60)
             self.log("Browser ready.\n")
         except Exception as e:
             raise RuntimeError(
                 f"Microsoft Edge could not launch.\n"
-                f"Fix: pip install webdriver-manager\n"
-                f"Or update msedgedriver to match your Edge version.\n"
+                f"Make sure Edge is installed and not already running\n"
+                f"with a conflicting profile.\n"
                 f"Error: {e}")
 
     def log(self, message: str):
@@ -448,37 +525,12 @@ class UPSTrackingBot:
         self.is_cancelled = True
 
     def close(self):
+        """Detach from the Edge driver. Does NOT kill the Edge process —
+        the user may want to keep the Edge window open for the next run."""
         if self.driver:
             try: self.driver.quit()
             except Exception: pass
-            # Give Edge a moment to fully release the profile lock
-            time.sleep(1)
-        # If the profile is still locked (Edge process didn't release it),
-        # kill only the Edge processes that are using OUR profile directory.
-        # This avoids killing the user's personal Edge browser sessions.
-        if sys.platform == "win32":
-            try:
-                # Use wmic to find Edge PIDs whose command line references
-                # our specific profile directory, then kill only those.
-                result = subprocess.run(
-                    ["wmic", "process", "where",
-                     f"name='msedge.exe' and commandline like '%{self.profile_dir}%'",
-                     "get", "processid"],
-                    capture_output=True, text=True, timeout=10
-                )
-                pids = []
-                for line in (result.stdout or "").splitlines():
-                    line = line.strip()
-                    if line.isdigit():
-                        pids.append(line)
-                for pid in pids:
-                    try:
-                        subprocess.run(["taskkill", "/F", "/PID", pid],
-                                       capture_output=True, timeout=5)
-                    except Exception:
-                        pass
-            except Exception:
-                pass
+            self.driver = None
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -713,6 +765,9 @@ class UPSGuiApp:
                                        style="Browse.TButton", command=self.open_csv_folder,
                                        state="disabled")
         self.open_csv_btn.pack(side="left", padx=(0, 8))
+        self.vpn_btn = ttk.Button(act, text="Open Edge Browser",
+                                  style="Browse.TButton", command=self.open_edge_browser)
+        self.vpn_btn.pack(side="left", padx=(0, 8))
         self.progress_label = tk.Label(act, text="Ready", bg=LIGHT, fg=NAVY,
                                        font=("Segoe UI", 9))
         self.progress_label.pack(side="left")
@@ -864,6 +919,21 @@ class UPSGuiApp:
             else: subprocess.run(["xdg-open", folder])
         else:
             messagebox.showwarning("No File", "No results file found yet!")
+
+    def open_edge_browser(self):
+        """Open the dedicated Edge automation browser with our profile+port."""
+        if is_port_open():
+            messagebox.showinfo("Edge Already Open",
+                                "The automation Edge browser is already running.\n"
+                                "You can click Start Tracking now.")
+            return
+        self.log_message("log", "Opening dedicated Edge automation browser...")
+        if open_vpn_setup_browser(log=self.log_message if hasattr(self, 'log_message') else print):
+            self.log_message("log", "Edge is ready. Click Start Tracking to begin.")
+        else:
+            messagebox.showwarning("Edge Failed",
+                                   "Could not open the automation Edge browser.\n"
+                                   "Make sure Microsoft Edge is installed.")
 
     def process_queue(self):
         try:
