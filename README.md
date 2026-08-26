@@ -1,6 +1,6 @@
 # gfh-ups-tracking-checker
 
-Standalone GFH Telecom Tkinter tool: `UPS_tracking_checker.pyw` — UPS package tracking
+Standalone GFH Telecom Tkinter tool: `gfh_ups_tracking_checker.pyw` — UPS package tracking
 verification via Selenium/Edge.
 
 Fixed: the "Progress & Results" log panel was cramped (window capped at
